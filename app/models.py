@@ -1,4 +1,7 @@
-from app import db
+import sys
+import re
+from app import db, app
+import flask.ext.whooshalchemy as whooshalchemy
 from hashlib import md5
 
 followers = db.Table('followers',
@@ -33,6 +36,10 @@ class User(db.Model):
 				break
 			version += 1
 		return new_nickname
+
+	@staticmethod
+	def make_valid_nickname(nickname):
+		return re.sub('[^a-zA-Z0-9_\.]', '', nickname)
 
 	def follow(self, user):
 		if not self.is_following(user):
@@ -75,5 +82,9 @@ class Post(db.Model):
 	timestamp = db.Column(db.DateTime)
 	user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
 
+	__searchable__ = ['body']
+
 	def __repr__(self):
 		return '<Post %r>' % self.body
+
+whooshalchemy.whoosh_index(app, Post)

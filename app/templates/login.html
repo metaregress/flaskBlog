@@ -18,7 +18,7 @@ function set_openid(openid, pr){
 	<form action="" method="post" name="login">
 		{{ form.hidden_tag() }}
 		<p>
-			Please enter your OpenID:<br />
+			{{ _('Please enter your OpenID') }}:<br />
 			{{ form.open_id(size=80) }}<br />
 			{% for error in form.open_id.errors %}
 				<span style="color: red;">[{{ error }}]</span>
@@ -27,7 +27,7 @@ function set_openid(openid, pr){
 			<a href="javascript:set_openid('{{ pr.url }}', '{{ pr.name }}');">{{ pr.name }}</a>|
 		{% endfor %}
 		</p>
-		<p>{{ form.remember_me }} Remember Me</p>
+		<p>{{ form.remember_me }} {{ _('Remember Me') }}</p>
 		<p><input type="submit" value="Sign In" /></p>
 	</form>
 {% endblock %}

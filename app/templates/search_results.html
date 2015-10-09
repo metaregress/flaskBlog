@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1>{{_('Search results for %(query)s', query=query) }}
+{% include 'flash.html' %}
+{% for post in results %}
+	{% include 'post.html' %}
+{% endfor %}
+{% endblock %}

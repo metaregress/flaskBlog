@@ -1,45 +1,43 @@
 from datetime import datetime
 from flask import render_template, flash, redirect, session, url_for, request, g
 from flask.ext.login import login_user, logout_user, current_user, login_required
-from app import app, db, lm, oid
-from .forms import LoginForm, EditForm
-from .models import User
+from flask.ext.babel import gettext
+from app import app, db, lm, oid, babel
+from .emails import follower_notification
+from .forms import LoginForm, EditForm, PostForm, SearchForm
+from .models import User, Post
+from config import POSTS_PER_PAGE, MAX_SEARCH_RESULTS, LANGUAGES
 
-@app.route('/')
-@app.route('/index')
+@app.route('/', methods=["GET", "POST"])
+@app.route('/index', methods=["GET", "POST"])
+@app.route('/index/<int:page>', methods=["GET", "POST"])
 @login_required
-def index():
+def index(page=1):
 	user = g.user
-	posts = [
-		{
-			'author': {'nickname' : 'Steven'}, 
-			'body' : 'Beautiful day in beach city :)'
-		},
-		{
-			'author': {'nickname' : 'Travis'},
-			'body': 'Can\'t wait for the new episode!'
-		},
-		{
-			'author': {'nickname' : 'Mable'},
-			'body': 'Where\'s Waddles??'
-		}
-	]
+	form = PostForm()
+	if form.validate_on_submit():
+		post = Post(body=form.post.data, timestamp=datetime.utcnow(), author=g.user)
+		db.session.add(post)
+		db.session.commit()
+		flash(gettext('Your post is now live!'))
+		return redirect(url_for('index'))
+	posts = g.user.followed_posts().paginate(page, POSTS_PER_PAGE, False)
+	
 	title = "All the news unfit to print"
 	return render_template('index.html', 
 							user=user,
-							posts=posts)
+							posts=posts,
+							form=form)
 
 @app.route('/user/<nickname>')
+@app.route('/user/<nickname>/<int:page>')
 @login_required
-def user(nickname):
+def user(nickname, page=1):
 	user = User.query.filter_by(nickname=nickname).first()
 	if user == None:
-		flash('User %s not found' % nickname)
+		flash(gettext('User %(nickname)s not found',  nickname=nickname))
 		return redirect(url_for('index'))
-	posts = [
-				{'author': user, 'body' : 'Test post 1'},
-				{'author': user, 'body' : 'Test post 2'}
-			]
+	posts = user.posts.paginate(page, POSTS_PER_PAGE, False)
 	return render_template('user.html',
 							title='%s\'s Profile' % nickname,
 							user=user,
@@ -49,13 +47,13 @@ def user(nickname):
 @app.route('/edit', methods=['GET', 'POST'])
 @login_required
 def edit():
-	form = EditForm(g.user.nickname)
+	form = EditForm(original_nickname=g.user.nickname)
 	if form.validate_on_submit():
 		g.user.nickname = form.nickname.data
 		g.user.about_me = form.about_me.data
 		db.session.add(g.user)
 		db.session.commit()
-		flash('Your changes have been saved.')
+		flash(gettext('Your changes have been saved.'))
 		return redirect(url_for('edit'))
 	else:
 		form.nickname.data = g.user.nickname
@@ -67,38 +65,58 @@ def edit():
 def follow(nickname):
 	user = User.query.filter_by(nickname=nickname).first()
 	if user is None:
-		flash('User %s not found' % nickname)
+		flash(gettext('User %(nickname)s not found', nickname = nickname))
 		return redirect(url_for('index'))
 	if user == g.user:
-		flash('You can\'t follow yourself')
-		return redirect(url_for('user', nickname=nickname))
+		flash(gettext('You can\'t follow yourself'))
+		return redirect(url_for('user', nickname = nickname))
 	u = g.user.follow(user)
 	if u is None:
-		flash('Cannot follow %s' % nickname)
-		return redirect(url_for('user', nickname=nickname))
+		flash(gettext('Cannot follow %(nickname)s', nickname = nickname))
+		return redirect(url_for('user', nickname = nickname))
 	db.session.add(u)
 	db.session.commit()
-	flash('You are now following %s!' % nickname)
-	return redirect(url_for('user', nickname=nickname))
+	follower_notification(user, g.user)
+	flash(gettext('You are now following %(nickname)s!', nickname = nickname))
+	return redirect(url_for('user', nickname = nickname))
 
 @app.route('/unfollow/<nickname>')
 @login_required
 def unfollow(nickname):
 	user = User.query.filter_by(nickname=nickname).first()
 	if user is None:
-		flash('User %s not found' % nickname)
+		flash(gettext('User %(nickname)s not found', nickname = nickname))
 		return redirect(url_for('index'))
 	if user == g.user:
-		flash('You can\'t unfollow yourself')
-		return redirect(url_for('user', nickname=nickname))
+		flash(gettext('You can\'t unfollow yourself'))
+		return redirect(url_for('user', nickname = nickname))
 	u = g.user.unfollow(user)
 	if u is None:
-		flash('Cannot unfollow %s' % nickname)
-		return redirect(url_for('user', nickname=nickname))
+		flash(gettext('Cannot unfollow %(nickname)s', nickname = nickname))
+		return redirect(url_for('user', nickname = nickname))
 	db.session.add(u)
 	db.session.commit()
-	flash('You are no longer following %s!' % nickname)
-	return redirect(url_for('user', nickname=nickname))
+	flash(gettext('You are no longer following %(nickname)s!', nickname = nickname))
+	return redirect(url_for('user', nickname = nickname))
+
+@app.route('/search', methods=['POST'])
+@login_required
+def search():
+	if not g.search_form.validate_on_submit():
+		return redirect(url_for('index'))
+	return redirect(url_for('search_results', query=g.search_form.search.data))
+
+@app.route('/search_results/<query>')
+@login_required
+def search_results(query):
+	results = Post.query.whoosh_search(query, MAX_SEARCH_RESULTS).all()
+	return render_template('search_results.html',
+							query=query,
+							results=results)
+
+@babel.localeselector
+def get_locale():
+	return request.accept_languages.best_match(LANGUAGES.keys())
 
 @app.route('/login', methods=['GET', 'POST'])
 @oid.loginhandler
@@ -117,7 +135,7 @@ def login():
 @oid.after_login
 def after_login(resp):
 	if resp.email is None or resp.email == "":
-		flash('Invalid login. Please try again.')
+		flash(gettext('Invalid login. Please try again.'))
 		return redirect(url_for('login'))
 	user = User.query.filter_by(email = resp.email).first()
 	if user is None:
@@ -146,10 +164,12 @@ def logout():
 @app.before_request
 def before_request():
 	g.user = current_user
-	if g.user.is_authenticated():
+	if g.user.is_authenticated:
 		g.user.last_seen = datetime.utcnow()
 		db.session.add(g.user)
 		db.session.commit()
+		g.search_form = SearchForm()
+	g.locale = get_locale()
 
 @lm.user_loader
 def load_user(id):
