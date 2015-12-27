@@ -1,0 +1,1 @@
+killall /home/ec2-user/flaskBlog/flask/bin/python
