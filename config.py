@@ -5,6 +5,9 @@ basedir = os.path.abspath(os.path.dirname(__file__))
 
 SQLALCHEMY_DATABASE_URI = 'sqlite:///' + os.path.join(basedir, 'app.db')
 SQLALCHEMY_MIGRATE_REPO = os.path.join(basedir, 'db_repository')
+SQLALCHEMY_RECORD_QUERIES = True
+# slow databse query threshold
+DATABASE_QUERY_TIMEOUT = 0.5
 
 WHOOSH_BASE = os.path.join(basedir, 'search.db')
 MAX_SEARCH_RESULTS = 50
@@ -19,6 +22,10 @@ LANGUAGES = {
     'en': 'English',
     'es': 'Español'
 }
+
+#microsoft translate creds
+MS_TRANSLATOR_CLIENT_ID = 'flaskTestTranslation'
+MS_TRANSLATOR_CLIENT_SECRET = 'JvzFsK5ZY/NVfdmw7BibhJou2uMxmDPzPS9ePUIWbVo='
 
 #mail server settings
 MAIL_SERVER = 'smtp.gmail.com'

@@ -73,7 +73,7 @@ class User(db.Model):
 		except NameError:
 			return str(self.id) #python 3
 
-	def __repr__(self):
+	def __repr__(self): # pragma: no cover
 		return '<User %r>' % self.nickname
 
 class Post(db.Model):
@@ -81,10 +81,11 @@ class Post(db.Model):
 	body = db.Column(db.String(140))
 	timestamp = db.Column(db.DateTime)
 	user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+	language = db.Column(db.String(5))
 
 	__searchable__ = ['body']
 
-	def __repr__(self):
+	def __repr__(self): # pragma: no cover
 		return '<Post %r>' % self.body
 
 whooshalchemy.whoosh_index(app, Post)

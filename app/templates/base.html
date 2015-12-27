@@ -6,6 +6,26 @@
 		<script src="/static/js/bootstrap.min.js"></script>
 		<script src="/static/js/moment.min.js"></script>
 		<meta name="viewport" content="width=device-width, initial-scale=1.0"> 
+
+		<script>
+		function translate(sourceLang, destLang, sourceId, destId, loadingId){
+			$(destId).hide();
+			$(loadingId).show();
+			$.post('/translate', {
+				text: $(sourceId).text(),
+				sourceLang: sourceLang,
+				destLang: destLang
+			}).done(function(translated){
+				$(destId).text(translated['text'])
+				$(loadingId).hide();
+				$(destId).show();
+			}).fail(function(){
+				$(destId).text(" {{ _('Error: could not contact the server') }}");
+				$(loadingId).hide();
+				$(destId).show();
+			});
+		}
+		</script>
 		{% if title %}
 		<title>{{ title }}</title>
 		{% else %}
